@@ -1,14 +1,36 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  /* Pure White Background for that clean SaaS look */
+  --background: #ffffff;
+  
+  /* Deep Zinc-950 for high-contrast text */
+  --foreground: #09090b;
+  
+  /* Neon/Brand Blue */
+  --primary: #2563eb;
+  
+  /* Card Background */
   --card: #ffffff;
-  --primary: #4f46e5; /* Indigo 600 */
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: 'Inter', sans-serif; /* Modern sans-serif */
+  /* Using Geist or Inter for a modern look */
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Fix for potential GSAP/Next.js "Fading" issues */
+.file-card, .animate-header, .animate-up {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Selection Highlight to match your brand blue */
+::selection {
+  background-color: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
 }
