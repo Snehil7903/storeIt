@@ -9,8 +9,8 @@ export default function UserMenu() {
 
   return (
     <div className="flex items-center gap-4 bg-zinc-50 p-2 pr-4 rounded-full border border-zinc-100 shadow-sm hover:bg-zinc-100 transition-colors">
-      <UserButton 
-        afterSignOutUrl="/" 
+      <UserButton
+        afterSignOutUrl="/sign-in" // Change from "/" to "/sign-in"
         appearance={{
           elements: {
             userButtonAvatarBox: "w-10 h-10 border-2 border-white shadow-sm"
