@@ -14,6 +14,7 @@ import {
   Link as LinkIcon,
   Check,
   Search,
+  Database,
   FileText,
   FileImage,
   FileCode,
@@ -23,17 +24,22 @@ import {
 
 export default function HomePage() {
   const [files, setFiles] = useState([]);
-  const [searchQuery, setSearchQuery] = useState(""); // Added Search State
+  const [totalSize, setTotalSize] = useState(0); // Added Storage State
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
-  const [copiedId, setCopiedId] = useState(null); 
+  const [copiedId, setCopiedId] = useState(null);
   const container = useRef(null);
 
-  // 1. Fetch Files from MongoDB GridFS
+  const STORAGE_LIMIT = 512 * 1024 * 1024; // 512MB limit for MongoDB Atlas Free Tier
+
+  // 1. Fetch Files & Storage Data
   async function fetchFiles() {
     try {
       const res = await fetch("/api/files");
       const data = await res.json();
-      setFiles(data);
+      // Expecting { files: [], totalSize: number } from your API
+      setFiles(data.files || []);
+      setTotalSize(data.totalSize || 0);
     } catch (error) {
       console.error("Failed to fetch:", error);
     } finally {
@@ -41,25 +47,34 @@ export default function HomePage() {
     }
   }
 
-  // 2. Filter Logic for Search
+  // 2. Helper to format bytes (e.g., 1024 -> 1KB)
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
+  const storagePercentage = Math.min((totalSize / STORAGE_LIMIT) * 100, 100);
+
+  // 3. Filter Logic for Search
   const filteredFiles = files.filter(file => 
     file.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // 3. Dynamic Icon Logic
+  // 4. Dynamic Icon Logic
   const getFileIcon = (fileName) => {
     const ext = fileName?.split('.').pop().toLowerCase();
     const props = { className: "text-white w-7 h-7" };
-    
     if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) return <FileImage {...props} />;
     if (['pdf', 'doc', 'docx', 'txt', 'rtf'].includes(ext)) return <FileText {...props} />;
     if (['js', 'jsx', 'ts', 'tsx', 'py', 'html', 'css', 'json', 'cpp'].includes(ext)) return <FileCode {...props} />;
     if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return <FileArchive {...props} />;
-    
     return <FileIconDefault {...props} />;
   };
 
-  // 4. Copy Link Logic - Uses file.token for public sharing
+  // 5. Copy Link Logic
   const copyToClipboard = (token) => {
     const url = `${window.location.origin}/api/download/${token}`;
     navigator.clipboard.writeText(url);
@@ -67,7 +82,7 @@ export default function HomePage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // 5. GSAP Entrance Animations
+  // 6. GSAP Entrance Animations
   useGSAP(() => {
     if (!loading) {
       const ctx = gsap.context(() => {
@@ -98,11 +113,9 @@ export default function HomePage() {
     }
   }, { scope: container, dependencies: [loading, filteredFiles.length] });
 
-  // 6. Delete Logic
+  // 7. Delete Logic
   async function deleteFile(token) {
     if (!confirm(`Are you sure you want to delete this file?`)) return;
-
-    // Clean token for selector (remove special chars)
     const cardId = token.replace(/[^\w-]/g, '');
 
     gsap.to(`.card-${cardId}`, {
@@ -139,7 +152,6 @@ export default function HomePage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
-            {/* SEARCH BAR */}
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
               <input 
@@ -150,7 +162,6 @@ export default function HomePage() {
                 className="w-full pl-12 pr-4 py-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all font-medium text-zinc-900 shadow-sm"
               />
             </div>
-            
             <Link
               href="/upload"
               className="w-full sm:w-auto group flex items-center justify-center gap-4 bg-zinc-950 text-white px-10 py-5 rounded-[2rem] font-bold transition-all hover:bg-zinc-800 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.3)] active:scale-95"
@@ -161,21 +172,35 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* Stats Grid */}
-        <div className="animate-header grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-          <div className="bg-zinc-50 border border-zinc-100 p-8 rounded-[2.5rem] flex items-center gap-6 group hover:bg-zinc-100 transition-colors">
-            <div className="bg-white p-5 rounded-2xl shadow-sm"><HardDrive className="text-blue-600" /></div>
-            <div>
-              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Protocol</p>
-              <p className="text-xl font-bold text-zinc-900 mt-1">GridFS</p>
-            </div>
-          </div>
+        {/* Stats & Storage Grid */}
+        <div className="animate-header grid grid-cols-1 lg:grid-cols-3 gap-8 mb-16">
           <div className="bg-zinc-50 border border-zinc-100 p-8 rounded-[2.5rem] flex items-center gap-6 group hover:bg-zinc-100 transition-colors">
             <div className="bg-white p-5 rounded-2xl shadow-sm"><Folder className="text-blue-600" /></div>
             <div>
-              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Total Assets</p>
-              <p className="text-xl font-bold text-zinc-900 mt-1">{files.length} Items</p>
+              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Vault Items</p>
+              <p className="text-xl font-bold text-zinc-900 mt-1">{files.length} Files</p>
             </div>
+          </div>
+
+          {/* STORAGE METER CARD */}
+          <div className="lg:col-span-2 bg-zinc-950 p-8 rounded-[2.5rem] flex flex-col justify-center relative overflow-hidden shadow-2xl">
+            <div className="flex justify-between items-end mb-4 relative z-10">
+              <div>
+                <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Storage Used</p>
+                <p className="text-2xl font-black text-white mt-1">
+                  {formatBytes(totalSize)} <span className="text-zinc-500 text-sm font-medium">/ 512 MB</span>
+                </p>
+              </div>
+              <Database className="text-blue-500 opacity-50" size={32} />
+            </div>
+            
+            <div className="h-3 w-full bg-white/10 rounded-full overflow-hidden p-[2px] border border-white/5 relative z-10">
+              <div 
+                className="h-full bg-blue-600 rounded-full shadow-[0_0_20px_rgba(37,99,235,0.6)] transition-all duration-1000 ease-out"
+                style={{ width: `${storagePercentage}%` }}
+              />
+            </div>
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 blur-[100px] -mr-32 -mt-32 rounded-full" />
           </div>
         </div>
 
@@ -198,9 +223,7 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {filteredFiles.map((file) => {
-              // Generate a safe CSS class name from the token for the animation
               const safeId = file.token.replace(/[^\w-]/g, '');
-              
               return (
                 <div
                   key={file.id}
@@ -211,11 +234,9 @@ export default function HomePage() {
                       <div className="bg-zinc-950 w-14 h-14 rounded-[1.25rem] flex items-center justify-center mb-8 shadow-xl group-hover:bg-blue-600 transition-colors duration-500">
                         {getFileIcon(file.name)}
                       </div>
-
                       <p className="text-[10px] font-black uppercase tracking-[0.25em] text-blue-600 mb-3">
                         Stored Encrypted
                       </p>
-
                       <h3 className="text-2xl font-bold text-zinc-950 truncate leading-tight tracking-tight" title={file.name}>
                         {file.name}
                       </h3>
@@ -223,7 +244,6 @@ export default function HomePage() {
 
                     <div className="mt-auto flex items-center justify-between border-t border-zinc-100 pt-8">
                       <div className="flex gap-4">
-                        {/* Use file.token for API calls */}
                         <a
                           href={`/api/download/${file.token}`}
                           className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-zinc-950 hover:text-blue-600 transition-colors"
@@ -231,7 +251,6 @@ export default function HomePage() {
                           <Download size={16} />
                           Save
                         </a>
-
                         <button
                           onClick={() => copyToClipboard(file.token)}
                           className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-zinc-950 hover:text-blue-600 transition-colors"

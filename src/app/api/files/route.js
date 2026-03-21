@@ -15,13 +15,17 @@ export async function GET() {
     .sort({ uploadDate: -1 })
     .toArray();
 
+  // 1. Calculate total storage used in bytes
+  const totalSize = files.reduce((acc, file) => acc + (file.length || 0), 0);
+
   const result = files.map(file => ({
     id: file._id.toString(),
-    token: file.filename, // The UUID for downloads
-    name: file.metadata?.originalName || file.filename, // The human name for display
+    token: file.filename,
+    name: file.metadata?.originalName || file.filename,
     size: file.length,
     uploadedAt: file.uploadDate,
   }));
 
-  return Response.json(result);
+  // 2. Return both the array and the sum
+  return Response.json({ files: result, totalSize });
 }
